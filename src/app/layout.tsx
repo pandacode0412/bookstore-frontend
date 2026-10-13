@@ -12,19 +12,24 @@ export const metadata: Metadata = {
   title: { default: 'Bookstore | Sách hay mỗi ngày', template: '%s | Bookstore' },
   description: 'Khám phá sách công nghệ, phát triển bản thân và nhiều tựa sách chọn lọc với giá minh bạch.',
   keywords: ['mua sách online', 'nhà sách trực tuyến', 'sách công nghệ', 'sách phát triển bản thân'],
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/brand/bookstore-logo.png',
+  },
   openGraph: { type: 'website', locale: 'vi_VN', siteName: 'Bookstore', title: 'Bookstore | Sách hay mỗi ngày', description: 'Khám phá những tựa sách chọn lọc cho hành trình học hỏi của bạn.' },
   twitter: { card: 'summary', title: 'Bookstore | Sách hay mỗi ngày', description: 'Khám phá những tựa sách chọn lọc cho hành trình học hỏi của bạn.' },
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="vi"><body className={`${bodyFont.variable} ${headingFont.variable}`}>
     <header className="site-header">
-      <div className="header-promo"><div className="container"><span>NHÀ SÁCH TRỰC TUYẾN · SÁCH HAY MỖI NGÀY</span><Link href="/books">KHÁM PHÁ SÁCH <b aria-hidden="true">→</b></Link></div></div>
-      <div className="container header-main">
+      <div className="header-primary"><div className="container header-main">
         <Link className="brand brand-symbol" href="/" aria-label="Bookstore - Trang chủ"><Image className="brand-logo" src="/brand/bookstore-logo.png" alt="" width={1254} height={1254} priority sizes="52px" /></Link>
-        <Link className="category-trigger" href="/books" aria-label="Xem danh mục sách"><HeaderIcon name="grid" /><small>Danh mục</small></Link>
+        <details className="category-menu"><summary className="category-trigger"><HeaderIcon name="grid" /><small>Danh mục</small></summary><div className="category-popover"><strong>Khám phá sách</strong><Link href="/books">Tất cả sách</Link><Link href="/books?sort=newest">Sách mới</Link><Link href="/books?sort=price_asc">Giá thấp đến cao</Link><Link href="/books?sort=price_desc">Giá cao đến thấp</Link><Link href="/wishlist">Sách yêu thích</Link><Link href="/orders">Đơn hàng của tôi</Link></div></details>
         <CatalogSearch />
         <nav className="header-actions" aria-label="Điều hướng mua sắm"><Link className="header-action header-favorite" href="/wishlist"><HeaderIcon name="heart" /><small>Yêu thích</small></Link><Link className="header-action" href="/cart"><HeaderIcon name="cart" /><small>Giỏ hàng</small></Link><AuthNavigation /></nav>
-      </div>
+      </div></div>
+      <nav className="header-quick-links" aria-label="Khám phá nhanh"><div className="container"><Link href="/">Trang chủ</Link><Link href="/books">Tất cả sách</Link><Link href="/books?sort=newest">Sách mới</Link><Link href="/books?sort=price_asc">Giá tốt</Link><Link href="/wishlist">Yêu thích</Link><Link href="/orders">Đơn hàng</Link></div></nav>
     </header>
     <main className="container">{children}</main>
     <footer className="site-footer"><div className="container footer-grid">
