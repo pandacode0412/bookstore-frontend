@@ -20,7 +20,8 @@ export class BrowserApiUnavailableError extends Error {
 
 export async function browserApi<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (init.body && !isFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(init.method?.toUpperCase() ?? 'GET')) {
     const token = csrfToken();
     if (token) headers.set('X-CSRF-Token', token);
@@ -30,7 +31,7 @@ export async function browserApi<T>(path: string, init: RequestInit = {}): Promi
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort();
   init.signal?.addEventListener('abort', abortFromCaller, { once: true });
-  const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+  const timeout = window.setTimeout(() => controller.abort(), isFormData ? 30_000 : requestTimeoutMs);
 
   let response: Response;
   try {

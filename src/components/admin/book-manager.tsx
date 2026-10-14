@@ -1,36 +1,83 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Archive, BookOpen, CheckCircle2, CircleOff, Eye, FilePenLine, LoaderCircle, PackageX, Plus, RefreshCw, Search } from 'lucide-react';
+import { AdminPagination } from '@/components/admin/admin-pagination';
 import { BrowserApiError, browserApi } from '@/lib/browser-api';
+import { notifyCatalogChanged } from '@/lib/catalog-change';
 import { vnd } from '@/lib/api';
-import type { AdminBook, AdminBookPage, AdminCategory } from '@/lib/types';
+import type { AdminBook, AdminBookPage, AdminBookSummary, AdminCategory } from '@/lib/types';
 
-type Draft = { sku: string; slug: string; title: string; categoryId: string; priceVnd: string; salePriceVnd: string; stock: string; status: AdminBook['status']; isbn: string; coverUrl: string; description: string; authors: string; images: string };
-const blank = (categoryId = ''): Draft => ({ sku: '', slug: '', title: '', categoryId, priceVnd: '', salePriceVnd: '', stock: '0', status: 'DRAFT', isbn: '', coverUrl: '', description: '', authors: '', images: '' });
+const labels: Record<AdminBook['status'], string> = { DRAFT: 'Nháp', PUBLISHED: 'Đang bán', ARCHIVED: 'Lưu trữ' };
 const message = (cause: unknown, fallback: string) => cause instanceof BrowserApiError ? cause.message : fallback;
 
-function draftOf(book: AdminBook): Draft { return { sku: book.sku, slug: book.slug, title: book.title, categoryId: book.category.id, priceVnd: String(book.priceVnd), salePriceVnd: book.salePriceVnd === null ? '' : String(book.salePriceVnd), stock: String(book.stock), status: book.status, isbn: book.isbn || '', coverUrl: book.coverUrl || '', description: book.description || '', authors: book.bookAuthors.map(item => item.author.name).join(', '), images: book.images.map(item => item.imageUrl).join('\n') }; }
-
 export function BookManager() {
-  const [books, setBooks] = useState<AdminBookPage | null>(null); const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [draft, setDraft] = useState<Draft>(blank()); const [editing, setEditing] = useState<AdminBook | null>(null);
-  const [query, setQuery] = useState(''); const [status, setStatus] = useState(''); const [pending, setPending] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
-  const load = useCallback(() => { setError(''); browserApi<AdminBookPage>(`/admin/books?page=1&limit=20&q=${encodeURIComponent(query)}${status ? `&status=${status}` : ''}`).then(setBooks).catch(cause => { setBooks({ items: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } }); setError(message(cause, 'Không thể tải danh sách sách.')); }); }, [query, status]);
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { browserApi<AdminCategory[]>('/admin/categories').then(items => { setCategories(items); setDraft(current => current.categoryId ? current : blank(items[0]?.id)); }).catch(() => setCategories([])); }, []);
-  const field = <K extends keyof Draft>(key: K) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDraft(current => ({ ...current, [key]: event.target.value }));
-  function beginCreate() { setEditing(null); setDraft(blank(categories[0]?.id)); setError(''); }
-  function edit(book: AdminBook) { setEditing(book); setDraft(draftOf(book)); setError(''); setNotice(''); }
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setPending(true); setError(''); setNotice('');
-    const payload = { sku: draft.sku, slug: draft.slug, title: draft.title, categoryId: draft.categoryId, priceVnd: Number(draft.priceVnd), salePriceVnd: draft.salePriceVnd ? Number(draft.salePriceVnd) : null, stock: Number(draft.stock), status: draft.status, isbn: draft.isbn || null, coverUrl: draft.coverUrl || null, description: draft.description || null, authors: draft.authors.split(',').map(value => value.trim()).filter(Boolean), images: draft.images.split('\n').map(value => value.trim()).filter(Boolean) };
-    if (!Number.isInteger(payload.priceVnd) || !Number.isInteger(payload.stock) || (payload.salePriceVnd !== null && !Number.isInteger(payload.salePriceVnd))) { setError('Giá và tồn kho phải là số nguyên VND hợp lệ.'); setPending(false); return; }
-    try { await browserApi<AdminBook>(editing ? `/admin/books/${editing.id}` : '/admin/books', { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(payload) }); setNotice(editing ? 'Đã cập nhật sách.' : 'Đã tạo sách mới.'); beginCreate(); load(); }
-    catch (cause) { setError(message(cause, 'Không thể lưu sách.')); } finally { setPending(false); }
+  const [books, setBooks] = useState<AdminBookPage | null>(null);
+  const [summary, setSummary] = useState<AdminBookSummary | null>(null);
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
+  const [page, setPage] = useState(1);
+  const [queryInput, setQueryInput] = useState('');
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState('');
+  const [summaryError, setSummaryError] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [archiving, setArchiving] = useState<string | null>(null);
+
+  const loadCategories = useCallback(async () => {
+    try { const items = await browserApi<AdminCategory[]>('/admin/categories'); setCategories(items); setCategoriesError(''); }
+    catch (cause) { setCategories([]); setCategoriesError(message(cause, 'Không thể tải thể loại để lọc sách.')); }
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    const params = new URLSearchParams({ page: String(page), limit: '20' });
+    if (query) params.set('q', query); if (status) params.set('status', status); if (categoryId) params.set('categoryId', categoryId);
+    const [booksResult, summaryResult] = await Promise.allSettled([browserApi<AdminBookPage>(`/admin/books?${params.toString()}`), browserApi<AdminBookSummary>('/admin/books/summary')]);
+    if (booksResult.status === 'fulfilled') setBooks(booksResult.value); else setError(message(booksResult.reason, 'Không thể tải danh sách sách.'));
+    if (summaryResult.status === 'fulfilled') { setSummary(summaryResult.value); setSummaryError(''); } else { setSummary(null); setSummaryError('Không thể tải thống kê sách.'); }
+    setLoading(false);
+  }, [categoryId, page, query, status]);
+
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadCategories(); }, [loadCategories]);
+
+  const isFiltered = Boolean(query || status || categoryId);
+  const stats = useMemo(() => summary ? [
+    { label: 'Tổng số sách', value: summary.total, icon: BookOpen }, { label: 'Sách đang bán', value: summary.published, icon: CheckCircle2 },
+    { label: 'Sách hết hàng', value: summary.outOfStock, icon: PackageX }, { label: 'Sách nháp', value: summary.draft, icon: FilePenLine },
+  ] : [], [summary]);
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setPage(1); setQuery(queryInput.trim()); }
+  function setFilter(setter: (value: string) => void, value: string) { setter(value); setPage(1); }
+  function clearFilters() { setQueryInput(''); setQuery(''); setStatus(''); setCategoryId(''); setPage(1); }
+  async function archive(book: AdminBook) {
+    if (!window.confirm(`Lưu trữ “${book.title}”? Sách sẽ không còn hiển thị trên cửa hàng, nhưng lịch sử đơn hàng vẫn được giữ.`)) return;
+    setArchiving(book.id); setError(''); setNotice('');
+    try { await browserApi<AdminBook>(`/admin/books/${book.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'ARCHIVED' }) }); notifyCatalogChanged(); setNotice(`Đã lưu trữ “${book.title}”.`); await load(); }
+    catch (cause) { setError(message(cause, 'Không thể lưu trữ sách.')); } finally { setArchiving(null); }
   }
-  return <section className="admin-module-page"><header className="admin-module-heading admin-module-heading-actions"><div><div className="eyebrow">DANH MỤC SẢN PHẨM</div><h1>Quản lý sách</h1><p>Giá, tồn kho và trạng thái xuất bản được kiểm tra ở backend.</p></div><button className="button" type="button" onClick={beginCreate}>Thêm sách</button></header>
-    <div className="admin-toolbar"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm tiêu đề, SKU hoặc slug" aria-label="Tìm sách" /><select value={status} onChange={event => setStatus(event.target.value)} aria-label="Lọc trạng thái"><option value="">Tất cả trạng thái</option><option value="DRAFT">Bản nháp</option><option value="PUBLISHED">Đang bán</option><option value="ARCHIVED">Lưu trữ</option></select></div>
-    <form className="admin-editor" onSubmit={save}><div className="admin-editor-heading"><h2>{editing ? `Sửa: ${editing.title}` : 'Tạo sách mới'}</h2>{editing && <button type="button" className="text-link" onClick={beginCreate}>Huỷ sửa</button>}</div><div className="admin-form-grid"><label><span>Tiêu đề</span><input value={draft.title} onChange={field('title')} required maxLength={255} /></label><label><span>SKU</span><input value={draft.sku} onChange={field('sku')} required maxLength={64} /></label><label><span>Slug</span><input value={draft.slug} onChange={field('slug')} required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label><label><span>Thể loại</span><select value={draft.categoryId} onChange={field('categoryId')} required><option value="" disabled>Chọn thể loại</option>{categories.map(category => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label><label><span>Giá gốc (VND)</span><input type="number" min="0" value={draft.priceVnd} onChange={field('priceVnd')} required /></label><label><span>Giá khuyến mãi (VND)</span><input type="number" min="0" value={draft.salePriceVnd} onChange={field('salePriceVnd')} /></label><label><span>Tồn kho</span><input type="number" min="0" value={draft.stock} onChange={field('stock')} required /></label><label><span>Trạng thái</span><select value={draft.status} onChange={field('status')}><option value="DRAFT">Bản nháp</option><option value="PUBLISHED">Đang bán</option><option value="ARCHIVED">Lưu trữ</option></select></label><label><span>ISBN</span><input value={draft.isbn} onChange={field('isbn')} maxLength={32} /></label><label><span>URL ảnh bìa</span><input value={draft.coverUrl} onChange={field('coverUrl')} placeholder="https://… hoặc /…" /></label><label className="admin-form-wide"><span>Tác giả (ngăn cách bằng dấu phẩy)</span><input value={draft.authors} onChange={field('authors')} placeholder="Tên tác giả" /></label><label className="admin-form-wide"><span>Ảnh phụ (mỗi URL một dòng)</span><textarea value={draft.images} onChange={field('images')} rows={3} /></label><label className="admin-form-wide"><span>Mô tả</span><textarea value={draft.description} onChange={field('description')} rows={4} maxLength={20000} /></label></div><div className="admin-editor-actions"><button className="button" disabled={pending || categories.length === 0} type="submit">{pending ? 'Đang lưu…' : editing ? 'Lưu thay đổi' : 'Tạo sách'}</button>{categories.length === 0 && <span>Hãy tạo thể loại trước khi thêm sách.</span>}</div>{error && <p className="admin-category-error" role="alert">{error}</p>}{notice && <p className="admin-success" role="status">{notice}</p>}</form>
-    <section className="admin-panel admin-table-panel"><div className="admin-panel-heading"><div><h2>Danh sách sách</h2><p>{books ? `${books.meta.total} bản ghi` : 'Đang tải…'}</p></div><button className="secondary-button" type="button" onClick={load}>Làm mới</button></div>{books === null ? <p className="admin-empty" aria-busy="true">Đang tải sách…</p> : books.items.length === 0 ? <p className="admin-empty">Không có sách phù hợp.</p> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Sách</th><th>Thể loại</th><th>Giá</th><th>Tồn</th><th>Trạng thái</th><th></th></tr></thead><tbody>{books.items.map(book => <tr key={book.id}><td><strong>{book.title}</strong><small>{book.sku} · {book.slug}</small></td><td>{book.category.name}</td><td>{vnd(book.salePriceVnd ?? book.priceVnd)}</td><td>{book.stock}</td><td><span className={`admin-tag is-${book.status.toLowerCase()}`}>{book.status === 'PUBLISHED' ? 'Đang bán' : book.status === 'DRAFT' ? 'Nháp' : 'Lưu trữ'}</span></td><td><button type="button" className="text-link" onClick={() => edit(book)}>Sửa</button></td></tr>)}</tbody></table></div>}</section>
+
+  return <section className="admin-module-page admin-books-page">
+    <header className="admin-module-heading admin-books-heading"><div><h1>Quản lý sách</h1><p>Quản lý sản phẩm, giá bán và tồn kho</p></div><Link className="button admin-primary-action" href="/admin/books/new"><Plus aria-hidden="true" size={18} />Thêm sách</Link></header>
+    {summaryError ? <p className="admin-data-note" role="status">{summaryError}</p> : <section className="admin-book-kpis" aria-label="Thống kê sách" aria-busy={!summary}>{summary ? stats.map(({ label, value, icon: Icon }) => <article key={label}><div><span>{label}</span><Icon aria-hidden="true" size={18} /></div><strong>{value}</strong></article>) : Array.from({ length: 4 }, (_, index) => <article className="is-loading" key={index}><div><span>Đang tải</span><LoaderCircle aria-hidden="true" className="admin-icon-spin" size={18} /></div><strong>—</strong></article>)}</section>}
+    <form className="admin-toolbar admin-book-toolbar" onSubmit={submitSearch}>
+      <label className="admin-book-search"><Search aria-hidden="true" size={18} /><span className="sr-only">Tìm sách</span><input value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="Tìm tên sách hoặc SKU" aria-label="Tìm theo tên sách hoặc SKU" /></label>
+      <select value={categoryId} onChange={(event) => setFilter(setCategoryId, event.target.value)} aria-label="Lọc theo thể loại" disabled={Boolean(categoriesError)}><option value="">Tất cả thể loại</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}{category.isActive ? '' : ' (đã ẩn)'}</option>)}</select>
+      <select value={status} onChange={(event) => setFilter(setStatus, event.target.value)} aria-label="Lọc theo trạng thái"><option value="">Tất cả trạng thái</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+      <button className="button admin-search-button" type="submit" disabled={loading || Boolean(archiving)}><Search aria-hidden="true" size={16} />Tìm kiếm</button>
+      <button className="secondary-button admin-book-refresh" type="button" onClick={() => void load()} disabled={loading || Boolean(archiving)} aria-label="Làm mới danh sách sách" title="Làm mới"><RefreshCw aria-hidden="true" size={17} className={loading ? 'admin-icon-spin' : undefined} /><span>Làm mới</span></button>
+      {isFiltered && <button className="secondary-button admin-clear-filters" type="button" onClick={clearFilters} disabled={loading || Boolean(archiving)}>Xóa bộ lọc</button>}
+    </form>
+    {categoriesError && <div className="admin-inline-error" role="alert"><span>{categoriesError}</span><button className="text-link" type="button" onClick={() => void loadCategories()}>Thử lại</button></div>}
+    {notice && <p className="admin-success" role="status">{notice}</p>}{error && <div className="admin-books-error" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>Thử lại</button></div>}
+    <section className="admin-panel admin-table-panel admin-books-panel"><div className="admin-panel-heading"><div><h2>Danh sách sách</h2><p>{books ? `${books.meta.total} bản ghi` : 'Đang tải dữ liệu…'}</p></div></div>
+      {books === null && !error ? <div className="admin-books-empty" aria-busy="true"><LoaderCircle aria-hidden="true" size={28} className="admin-icon-spin" /><h3>Đang tải sách…</h3></div> : books && books.items.length === 0 ? <div className="admin-books-empty"><CircleOff aria-hidden="true" size={32} /><h3>{isFiltered ? 'Không tìm thấy sách phù hợp' : 'Chưa có sách'}</h3><p>{isFiltered ? 'Hãy thử điều chỉnh từ khóa hoặc bộ lọc.' : 'Thêm sách đầu tiên để bắt đầu quản lý catalog.'}</p>{isFiltered ? <button className="secondary-button" type="button" onClick={clearFilters}>Xóa bộ lọc</button> : <Link className="button" href="/admin/books/new"><Plus aria-hidden="true" size={17} />Thêm sách</Link>}</div> : books && <div className="admin-table-wrap"><table className="admin-table admin-books-table"><thead><tr><th>Ảnh bìa</th><th>Sách</th><th>Thể loại</th><th>Giá bán</th><th>Tồn kho</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead><tbody>{books.items.map((book) => <tr key={book.id}><td data-label="Ảnh bìa"><div className="admin-book-cover">{book.coverUrl ? <img src={book.coverUrl} alt={`Bìa sách ${book.title}`} /> : <span title="Chưa có ảnh bìa"><BookOpen aria-hidden="true" size={20} /></span>}</div></td><td data-label="Sách"><strong>{book.title}</strong><small>{book.sku}{book.isbn ? ` · ISBN ${book.isbn}` : ''}</small></td><td data-label="Thể loại">{book.category.name}</td><td data-label="Giá bán"><strong>{vnd(book.salePriceVnd ?? book.priceVnd)}</strong>{book.salePriceVnd !== null && <small className="admin-book-base-price">{vnd(book.priceVnd)}</small>}</td><td data-label="Tồn kho"><span className={book.stock === 0 ? 'admin-stock-empty' : undefined}>{book.stock}</span></td><td data-label="Trạng thái"><span className={`admin-tag is-${book.status.toLowerCase()}`}>{labels[book.status]}</span></td><td className="admin-book-actions" data-label="Thao tác">{book.status === 'PUBLISHED' && <Link className="admin-icon-button" href={`/books/${book.slug}`} aria-label={`Xem ${book.title} trên cửa hàng`} title="Xem trên cửa hàng"><Eye aria-hidden="true" size={18} /></Link>}<Link className="admin-icon-button" href={`/admin/books/${book.id}/edit`} aria-label={`Sửa ${book.title}`} title="Chỉnh sửa"><FilePenLine aria-hidden="true" size={18} /></Link>{book.status !== 'ARCHIVED' && <button type="button" className="admin-icon-button is-danger" onClick={() => void archive(book)} disabled={archiving === book.id} aria-label={`Lưu trữ ${book.title}`} title="Lưu trữ">{archiving === book.id ? <LoaderCircle aria-hidden="true" size={18} className="admin-icon-spin" /> : <Archive aria-hidden="true" size={18} />}</button>}</td></tr>)}</tbody></table></div>}
+      {books && <AdminPagination meta={books.meta} onPageChange={setPage} label="danh sách sách" />}
+    </section>
   </section>;
 }

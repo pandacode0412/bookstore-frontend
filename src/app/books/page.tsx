@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   description: 'Tìm và khám phá những tựa sách chọn lọc tại Bookstore.',
   alternates: { canonical: '/books' },
 };
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;

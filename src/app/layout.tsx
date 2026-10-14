@@ -6,6 +6,7 @@ import './home-hero.css';
 import './auth-pages.css';
 import './auth-password-icons.css';
 import './site-header.css';
+import './book-data.css';
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

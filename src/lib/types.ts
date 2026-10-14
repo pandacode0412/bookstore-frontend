@@ -11,6 +11,7 @@ export type Banner = { id: string; title: string; altText: string; imageUrl: str
 export type AdminBanner = Banner & { isActive: boolean; sortOrder: number; createdAt: string; updatedAt: string };
 export type AdminBook = { id: string; sku: string; isbn: string | null; slug: string; title: string; description: string | null; coverUrl: string | null; priceVnd: number; salePriceVnd: number | null; stock: number; status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'; createdAt: string; updatedAt: string; category: { id: string; name: string; slug: string }; images: { id: string; imageUrl: string; sortOrder: number }[]; bookAuthors: { author: { id: string; name: string } }[] };
 export type AdminBookPage = { items: AdminBook[]; meta: BookPage['meta'] };
+export type AdminBookSummary = { total: number; published: number; draft: number; archived: number; outOfStock: number };
 export type BookListQuery = { page?: number; limit?: number; q?: string; category?: string; onSale?: boolean; sort?: 'newest' | 'price_asc' | 'price_desc' | 'bestselling' };
 export type CurrentUser = { id: string; email: string; fullName: string | null; role: 'CUSTOMER' | 'ADMIN' };
 export type CartItem = { book: Book; quantity: number; unitPriceVnd: number; lineTotalVnd: number };

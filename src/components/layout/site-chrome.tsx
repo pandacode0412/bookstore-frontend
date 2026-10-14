@@ -2,11 +2,19 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { SiteHeader } from './site-header';
+import { subscribeToCatalogChanges } from '@/lib/catalog-change';
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => subscribeToCatalogChanges(() => {
+    if (!pathname.startsWith('/admin')) router.refresh();
+  }), [pathname, router]);
+
   if (pathname.startsWith('/admin')) return <>{children}</>;
   return <>
     <SiteHeader />

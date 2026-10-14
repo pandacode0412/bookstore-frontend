@@ -4,7 +4,7 @@ import type { Book } from '@/lib/types';
 
 export function BookCard({ book }: { book: Book }) {
   return <Link className="book-card" href={`/books/${book.slug}`}>
-    <div className="book-cover" aria-hidden="true"><span>📚</span><small>{book.category.name}</small></div>
+    <div className="book-cover">{book.coverUrl ? <img src={book.coverUrl} alt={`Bìa sách ${book.title}`} loading="lazy" /> : <div className="book-cover-fallback">Chưa có ảnh bìa</div>}</div>
     <div className="book-content"><div className="eyebrow">{book.sku}</div>
       <h3>{book.title}</h3><div className="price">{vnd(book.salePriceVnd ?? book.priceVnd)}</div>
       {book.salePriceVnd != null && <div className="old-price">{vnd(book.priceVnd)}</div>}
