@@ -19,13 +19,20 @@
 | `/checkout` | Customer | saved address, COD, summary, place | stock conflict/retry |
 | `/orders` | Customer | list/status/history | empty/login required |
 | `/orders/[id]` | Owner | items, status, cancel pending | forbidden/invalid state |
-| `/admin` | Admin | live KPI summary, order status distribution, 5 newest orders | loading/error/forbidden |
-| `/admin/books` | Admin | list filters/create/edit/publish | validation |
-| `/admin/categories` | Admin | category/author management | conflict |
-| `/admin/orders` | Admin | queue, detail, actions | invalid transition |
+| `/admin` | Admin | isolated SaaS dashboard, KPIs, statuses, newest orders/top sellers | loading/error/forbidden |
+| `/admin/books` | Admin | create/edit/archive books, pricing/stock/gallery URLs | validation |
+| `/admin/categories` | Admin | category description/active/display order | conflict |
+| `/admin/banners` | Admin | create/edit/activate/reorder URL-based banners | validation |
+| `/admin/orders` | Admin | searchable orders, safe transition/history | invalid transition |
+| `/admin/customers` | Admin | customer-safe search directory | loading/empty/error |
 
 ## Storefront layout
-- Header: banner thương hiệu ngắn gọn có CTA catalog; logo dẫn về trang chủ; nút danh mục; tìm kiếm thật đưa `q` sang `/books`; vùng action luôn có giỏ hàng và icon tài khoản, kể cả khi đang kiểm tra phiên. Khi đã đăng nhập, hover hoặc focus icon tài khoản mở menu có tên/email, trang tài khoản, đơn hàng và đăng xuất; chạm trên mobile vẫn dẫn tới `/account`. Không hiển thị thông báo, % giảm giá, hoặc chính sách không có chức năng tương ứng. Trên màn nhỏ các nhóm tự xuống dòng, không che nội dung.
+- Header: hai hàng trên desktop. Hàng chính giữ logo, nút danh mục, tìm kiếm (phần tử co giãn chính), yêu thích, giỏ hàng và tài khoản; hàng điều hướng nhanh được căn giữa, có chỉ báo route đang mở và focus/hover dễ nhận biết. Khi tài khoản có dữ liệu, badge số lượng chỉ hiện với giỏ hàng/yêu thích lớn hơn 0; khách chưa đăng nhập không thấy số `0`. Ngay khi phiên đăng nhập được tạo, action tài khoản đổi từ icon user mặc định sang avatar chữ cái và hiển thị tên người dùng; sau đăng xuất nó trở lại trạng thái khách. Dropdown tài khoản hiện có vẫn mở bằng hover/focus với tên/email, trang tài khoản, đơn hàng và đăng xuất.
+- Secondary navigation chỉ phục vụ khám phá catalog: `Trang chủ`, `Tất cả sách`, dropdown `Thể loại`, `Sách mới`, `Bán chạy`, `Khuyến mãi`. Dropdown `Thể loại` lấy dữ liệu thật từ `GET /categories`, dùng native `details/summary` để thao tác được bằng bàn phím, có trạng thái tải/rỗng và liên kết xem toàn bộ sách. `Yêu thích`/`Đơn hàng` chỉ còn ở action/account area, không bị lặp trong secondary navigation.
+- Storefront category dropdown chỉ render `id`, `name`, `slug` từ public API; category inactive không xuất hiện. Lỗi tải có nút thử lại, desktop hiển thị lưới phù hợp số lượng category và mobile dùng các link chạm tối thiểu 44px trong drawer. Sau khi ADMIN lưu category, header refresh dữ liệu ngay trong phiên hiện tại.
+- `Bán chạy` dùng API `GET /books?sort=bestselling`, chỉ xếp hạng quantity từ đơn `DELIVERED`; danh sách có thể rỗng khi chưa có đơn giao thành công. `Khuyến mãi` dùng `GET /books?onSale=true`, chỉ hiện sách public có giá giảm. Bộ lọc catalog có thêm sort Bán chạy và checkbox “Chỉ sách khuyến mãi”.
+- Header mobile: hàng gọn chỉ gồm menu hamburger, logo và giỏ hàng; tìm kiếm chiếm toàn bộ hàng kế tiếp. Menu drawer thay thế navigation/danh mục, có link tài khoản, yêu thích và đơn hàng; link tài khoản dùng cùng avatar chữ cái/tên sau khi đăng nhập. Mọi điểm chạm chính tối thiểu 44px, không tạo cuộn ngang. Header không sticky để hero full-bleed luôn nằm đúng ngay dưới navigation và không che nội dung khi đọc.
+- Trang chủ dùng hero carousel full-bleed ngay dưới navigation, hiển thị đúng một trong ba asset nội bộ `public/banner/` tại mỗi thời điểm. Nó không giới hạn bởi container nội dung, có chiều cao desktop `450–600px`, tự điều chỉnh cho tablet/mobile, dùng `next/image`, `object-fit: cover` và `object-position` theo từng asset để tránh cắt nội dung quan trọng. Slide đầu được ưu tiên tải, hai slide sau lazy-load; carousel tự chuyển 5 giây, lặp vô hạn, dừng khi hover/focus, hỗ trợ vuốt trên mobile, arrows hai cạnh, 3 dots đáy giữa và `prefers-reduced-motion`. Không thêm text overlay lên artwork đã có nội dung khuyến mãi.
 - Icon trong header là SVG nét đơn sắc cùng hệ (sách, danh mục, tìm kiếm, giỏ hàng, tài khoản), có nhãn văn bản và `aria-label` ở hành động chỉ còn icon trên mobile; không dùng emoji vì dễ khác kiểu giữa trình duyệt/thiết bị.
 - Logo thương hiệu dùng asset `public/brand/bookstore-logo.png` (xe đẩy và sách), hiển thị độc lập ở header/footer, không kèm wordmark. Dùng `next/image`, có kích thước cố định để tránh layout shift, và `alt` rỗng vì liên kết chứa `aria-label` là tên truy cập được.
 - Header có biểu tượng trái tim cỡ bằng các action còn lại, với vòng nền xanh đậm và nét trắng tương phản rõ. Nó dẫn tới `/wishlist`; khách đăng nhập có thể lưu/bỏ lưu trực tiếp tại trang chi tiết sách.
@@ -34,6 +41,7 @@
 - Detail: title/author/category/isbn/description; price; stock; qty; add to cart CTA.
 - Cart: implemented persisted server state; quantity update/remove with loading/error states; summary is indicative only and checkout server must revalidate.
 - Guest mở `/cart` thấy một sign-in gate dạng hai cột có minh hoạ giỏ hàng, lợi ích thật của tài khoản và CTA đăng nhập/xem sách; lỗi tải API thông thường có nút thử lại, không bị nhầm với yêu cầu đăng nhập.
+- Login/Register dùng một card trắng tối đa 440px trên nền kem nhạt, logo dẫn về trang chủ, typography/spacing đồng nhất và responsive không có thanh cuộn nội bộ. Login gồm Email, Mật khẩu có toggle SVG Eye/EyeOff 20px bên trong input (mỗi field độc lập, có nhãn truy cập được), hành động “Quên mật khẩu?” hiển thị trạng thái trung thực khi API reset chưa có, CTA và liên kết đăng ký. Register thêm Họ tên, Xác nhận mật khẩu và validation khớp mật khẩu ở client; API/session hiện có vẫn là nguồn xác thực cuối cùng.
 - Form đăng ký/đăng nhập chỉ hiển thị lỗi của lần gửi hiện tại; phản hồi cũ không được ghi đè kết quả mới. Khi thành công, khách đã có phiên đăng nhập và được chuyển thẳng về trang chủ.
 - `/account` là trang riêng tư, noindex: hiển thị đúng họ tên/email từ `/auth/me`, các địa chỉ giao hàng đã lưu từ `GET /addresses`, lối tắt tới giỏ hàng/đơn hàng và đăng xuất. Có loading/error/empty state cho địa chỉ; chưa có API chỉnh sửa hồ sơ hoặc địa chỉ nên không hiển thị biểu mẫu cập nhật giả.
 - Đăng xuất chỉ thay đổi giao diện sau khi API xác nhận thành công. Nếu session hoặc CSRF lỗi, menu/header và trang tài khoản giữ phiên hiện tại và hiển thị lỗi có thể thao tác lại.
@@ -64,6 +72,9 @@ Auth forms submit at most one request at a time. A successful authentication cle
 - Confirm dangerous actions, disabled invalid transition buttons, show success/error toast after response.
 - Display VND integer formatted using `Intl.NumberFormat('vi-VN')`.
 - The `/admin` route is not part of public navigation. The frontend only renders its link for `ADMIN`; the route has an initial client role gate, while the backend `/api/admin/*` endpoints independently enforce `ADMIN` before any data/action is exposed. The implemented dashboard reads its live metrics from `GET /admin/dashboard`, has loading/error/retry states, and is responsive from a four-card desktop grid to a single-column mobile view.
+- Admin dashboard có thêm quản lý category: ADMIN tạo mới, sửa tên/slug, bật-tắt hiển thị và đặt thứ tự bằng API protected. Form có validation browser cơ bản, loading/error state; backend vẫn là nguồn validation cuối cùng và header được báo refresh khi thao tác thành công.
+- `/admin` dùng workspace tách khỏi storefront (không header/footer mua sắm), sidebar trái, topbar tài khoản ADMIN và mobile drawer. Các module dùng cùng loading/empty/error/table/form patterns, responsive không buộc table tràn viewport ngoài vùng cuộn ngang nội bộ.
+- Banner management chỉ nhận URL HTTPS hoặc asset storefront và cho xem trước; không hiển thị upload file giả vì storage/quét tệp chưa được cung cấp. Homepage carousel lấy `GET /banners`, do đó bật/tắt/thay đổi thứ tự được phản ánh sau lần tải trang kế tiếp.
 - The admin gate never silently redirects a signed-in customer: it shows a clear access-denied state with the current account email. Guests see a login CTA. If the API cannot be reached, the gate times out after 10 seconds and shows a retry action instead of loading forever. This makes role/session errors diagnosable without exposing admin content.
 
 ## MVP note

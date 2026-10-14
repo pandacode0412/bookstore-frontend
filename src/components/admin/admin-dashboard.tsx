@@ -12,7 +12,7 @@ const statusLabels: Record<OrderStatus, string> = {
 const orderStatuses = Object.keys(statusLabels) as OrderStatus[];
 const date = (value: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 
-export function AdminDashboardClient() {
+export function AdminDashboardClient({ children }: { children?: React.ReactNode }) {
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [error, setError] = useState('');
   const load = useCallback(() => {
@@ -34,7 +34,7 @@ export function AdminDashboardClient() {
     ['Tổng đơn hàng', String(metrics.totalOrders), `${metrics.pendingOrders} đơn cần xác nhận`],
     ['Doanh thu đã giao', vnd(metrics.deliveredRevenueVnd), 'Chỉ tính đơn đã giao thành công'],
     ['Sách đang bán', String(metrics.publishedBooks), `${metrics.totalBooks} đầu sách trong hệ thống`],
-    ['Sắp hết hàng', String(metrics.lowStockBooks), 'Sách đang bán có tồn kho từ 5 trở xuống'],
+    ['Khách hàng', String(metrics.totalCustomers), 'Tài khoản khách hàng đã đăng ký'],
   ];
   return <main className="admin-dashboard">
     <header className="admin-dashboard-heading"><div><div className="eyebrow">QUẢN TRỊ</div><h1>Tổng quan vận hành</h1><p>Số liệu được lấy trực tiếp từ hệ thống đơn hàng và kho sách.</p></div><button type="button" className="secondary-button" onClick={load}>Làm mới</button></header>
@@ -42,6 +42,6 @@ export function AdminDashboardClient() {
     <section className="admin-dashboard-grid">
       <article className="admin-panel"><div className="admin-panel-heading"><div><h2>Tiến độ đơn hàng</h2><p>Phân bổ tất cả đơn theo trạng thái hiện tại.</p></div></div><dl className="admin-status-list">{orderStatuses.map(status => <div key={status}><dt><span className={`order-status status-${status.toLowerCase()}`}>{statusLabels[status]}</span></dt><dd>{orderStatus[status]}</dd></div>)}</dl></article>
       <article className="admin-panel"><div className="admin-panel-heading"><div><h2>Đơn hàng mới nhất</h2><p>5 đơn được tạo gần đây nhất.</p></div></div>{recentOrders.length === 0 ? <p className="admin-empty">Chưa có đơn hàng nào.</p> : <div className="admin-recent-orders">{recentOrders.map(order => <div className="admin-recent-order" key={order.id}><div><strong>{order.orderCode}</strong><span>{order.customerName} · {order.itemCount} sản phẩm</span><small>{date(order.createdAt)}</small></div><div><span className={`order-status status-${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span><strong>{vnd(order.totalVnd)}</strong></div></div>)}</div>}</article>
-    </section>
+    </section><section className="admin-panel"><div className="admin-panel-heading"><div><h2>Sách bán chạy</h2><p>Chỉ tính số lượng từ các đơn đã giao thành công.</p></div></div>{dashboard.topSellingBooks.length === 0 ? <p className="admin-empty">Chưa có dữ liệu bán hàng đã giao.</p> : <div className="admin-top-selling">{dashboard.topSellingBooks.map((book, index) => <div key={book.id}><span><strong>{index + 1}. {book.title}</strong><small>{book.sku}</small></span><strong>{book.soldQuantity} đã bán</strong></div>)}</div>}</section>{children}
   </main>;
 }

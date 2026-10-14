@@ -6,7 +6,12 @@ export type Book = {
 export type BookDetail = Book & { isbn: string | null; description: string | null; bookAuthors: { author: { name: string } }[] };
 export type BookPage = { items: Book[]; meta: { page: number; limit: number; total: number; totalPages: number } };
 export type Category = { id: string; name: string; slug: string };
-export type BookListQuery = { page?: number; limit?: number; q?: string; category?: string; sort?: 'newest' | 'price_asc' | 'price_desc' };
+export type AdminCategory = Category & { description: string | null; isActive: boolean; sortOrder: number };
+export type Banner = { id: string; title: string; altText: string; imageUrl: string; href: string; objectPosition: string };
+export type AdminBanner = Banner & { isActive: boolean; sortOrder: number; createdAt: string; updatedAt: string };
+export type AdminBook = { id: string; sku: string; isbn: string | null; slug: string; title: string; description: string | null; coverUrl: string | null; priceVnd: number; salePriceVnd: number | null; stock: number; status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'; createdAt: string; updatedAt: string; category: { id: string; name: string; slug: string }; images: { id: string; imageUrl: string; sortOrder: number }[]; bookAuthors: { author: { id: string; name: string } }[] };
+export type AdminBookPage = { items: AdminBook[]; meta: BookPage['meta'] };
+export type BookListQuery = { page?: number; limit?: number; q?: string; category?: string; onSale?: boolean; sort?: 'newest' | 'price_asc' | 'price_desc' | 'bestselling' };
 export type CurrentUser = { id: string; email: string; fullName: string | null; role: 'CUSTOMER' | 'ADMIN' };
 export type CartItem = { book: Book; quantity: number; unitPriceVnd: number; lineTotalVnd: number };
 export type Cart = { items: CartItem[]; estimatedSubtotalVnd: number };
@@ -17,8 +22,13 @@ export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKING' | 'SHIPPING' | 'DE
 export type DeliverySnapshot = Omit<Address, 'id' | 'isDefault'>;
 export type OrderItem = { bookId: string; skuSnapshot: string; titleSnapshot: string; unitPriceVnd: number; quantity: number; lineTotalVnd: number };
 export type Order = { id: string; orderCode: string; status: OrderStatus; paymentMethod: 'COD'; paymentStatus: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'; subtotalVnd: number; shippingFeeVnd: number; totalVnd: number; addressSnapshot: DeliverySnapshot; note: string | null; createdAt: string; items: OrderItem[] };
+export type AdminOrder = Order & { customer: { id: string; fullName: string | null; email: string }; statusHistory: { id: string; fromStatus: OrderStatus; toStatus: OrderStatus; reason: string | null; createdAt: string; actorName: string }[] };
+export type AdminOrderPage = { items: AdminOrder[]; meta: BookPage['meta'] };
+export type AdminCustomer = { id: string; fullName: string | null; email: string; createdAt: string; orderCount: number };
+export type AdminCustomerPage = { items: AdminCustomer[]; meta: BookPage['meta'] };
 export type AdminDashboard = {
-  metrics: { totalBooks: number; publishedBooks: number; lowStockBooks: number; totalOrders: number; pendingOrders: number; deliveredRevenueVnd: number };
+  metrics: { totalBooks: number; publishedBooks: number; lowStockBooks: number; totalOrders: number; totalCustomers: number; pendingOrders: number; deliveredRevenueVnd: number };
   orderStatus: Record<OrderStatus, number>;
   recentOrders: { id: string; orderCode: string; status: OrderStatus; totalVnd: number; createdAt: string; customerName: string; itemCount: number }[];
+  topSellingBooks: { id: string; title: string; sku: string; soldQuantity: number }[];
 };

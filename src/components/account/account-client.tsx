@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { browserApi } from '@/lib/browser-api';
+import { notifyAuthSessionChanged } from '@/lib/auth-session';
 import type { Address, CurrentUser } from '@/lib/types';
 import { HeaderIcon } from '@/components/layout/header-icon';
 
@@ -41,6 +42,7 @@ export function AccountClient() {
     try { await browserApi<void>('/auth/logout', { method: 'POST' }); }
     catch (cause) { setLogoutError(cause instanceof Error ? cause.message : 'Không thể đăng xuất. Vui lòng thử lại.'); setLoggingOut(false); return; }
     setUser(null);
+    notifyAuthSessionChanged();
     router.push('/');
     router.refresh();
   }

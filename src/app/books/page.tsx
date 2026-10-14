@@ -6,7 +6,7 @@ import type { BookListQuery, Category } from '@/lib/types';
 
 type SearchParams = Record<string, string | string[] | undefined>;
 type BookSort = NonNullable<BookListQuery['sort']>;
-const sorts = new Set<BookSort>(['newest', 'price_asc', 'price_desc']);
+const sorts = new Set<BookSort>(['newest', 'price_asc', 'price_desc', 'bestselling']);
 
 export const metadata: Metadata = {
   title: 'Danh mục sách',
@@ -23,11 +23,13 @@ function parseQuery(params: SearchParams): Required<BookListQuery> {
   const rawQ = (first(params.q) ?? '').trim();
   const rawCategory = (first(params.category) ?? '').trim();
   const rawSort = first(params.sort);
+  const onSale = first(params.onSale) === 'true';
   return {
     page: Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1,
     limit: 12,
     q: rawQ.slice(0, 100),
     category: /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rawCategory) ? rawCategory : '',
+    onSale,
     sort: sorts.has(rawSort as BookSort) ? rawSort as BookSort : 'newest',
   };
 }
@@ -37,6 +39,7 @@ function pageHref(query: Required<BookListQuery>, page: number) {
   params.set('page', String(page));
   if (query.q) params.set('q', query.q);
   if (query.category) params.set('category', query.category);
+  if (query.onSale) params.set('onSale', 'true');
   if (query.sort !== 'newest') params.set('sort', query.sort);
   return `/books?${params.toString()}`;
 }
@@ -55,10 +58,12 @@ function CatalogFilters({ categories, query }: { categories: Category[]; query: 
     <label htmlFor="catalog-sort"><span>Sắp xếp</span>
       <select id="catalog-sort" name="sort" defaultValue={query.sort}>
         <option value="newest">Mới nhất</option>
+        <option value="bestselling">Bán chạy</option>
         <option value="price_asc">Giá thấp đến cao</option>
         <option value="price_desc">Giá cao đến thấp</option>
       </select>
     </label>
+    <label className="catalog-sale-filter" htmlFor="catalog-on-sale"><input id="catalog-on-sale" name="onSale" type="checkbox" value="true" defaultChecked={query.onSale} /><span>Chỉ sách khuyến mãi</span></label>
     <button className="button" type="submit">Lọc sách</button>
   </form>;
 }

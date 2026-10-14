@@ -44,8 +44,15 @@ const data = await response.json();
 
 ## ADMIN dashboard
 
-- `GET /admin/dashboard` is a cookie-authenticated, read-only ADMIN endpoint. It returns book/order metrics, delivered-only revenue, a zero-filled order-status distribution, and at most five newest orders.
-- The dashboard UI does not calculate revenue or infer status totals. It displays the response and handles `401`, `403`, loading, network error, and retry states. Catalog, order transition, and inventory mutation endpoints are not yet exposed in this UI.
+- `GET /admin/dashboard` is a cookie-authenticated ADMIN endpoint. It returns book/order/customer metrics, delivered-only revenue, a zero-filled order-status distribution, at most five newest orders, and delivered-order top sellers.
+- The dashboard UI does not calculate revenue or infer status totals. It displays the response and handles `401`, `403`, loading, network error, and retry states.
+
+## ADMIN content operations
+
+- `GET/POST/PATCH /admin/books` backs the Books module. Payloads contain VND integer values, category UUID, status, URL-based cover/gallery, and author names; server validation remains authoritative.
+- `GET/POST/PATCH /admin/banners` backs the Banner module; public home carousel data is `GET /banners`. File upload is intentionally absent until a storage provider and security policy exist.
+- `GET /admin/orders` plus `PATCH /admin/orders/{id}/status` backs the Order module. The UI only offers backend-supported next statuses and asks for explicit confirmation for each operation.
+- `GET /admin/customers` backs the Customer module and exposes no client-side account mutation.
 
 ## Ownership boundaries
 Never calculate authoritative total in frontend; local numbers are display estimates. Never accept client `priceVnd` when creating order. Only Backend updates inventory/order states.
@@ -57,4 +64,4 @@ Never calculate authoritative total in frontend; local numbers are display estim
 4. Merge/change coordination by breaking-change label.
 
 ## MVP statuses
-Catalog, Auth, Cart, saved Address, checkout, customer Order endpoints, and the read-only ADMIN dashboard endpoint are implemented. Other admin endpoints remain design contract.
+Catalog, active banners, Auth, Cart, saved Address, checkout, customer Order endpoints, and documented ADMIN dashboard/content endpoints are implemented. File upload, inventory adjustment and standalone coupon engine remain outside the current contract.
